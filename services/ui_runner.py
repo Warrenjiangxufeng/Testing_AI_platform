@@ -10,21 +10,62 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
 from pathlib import Path
 
-CODEX = "/usr/local/bin/codex"
-PLAYWRIGHT = "/usr/local/bin/playwright-cli"
-NODE22 = os.path.expanduser("~/.local/node-v22.23.2-darwin-x64/bin")
 PROJ = Path(__file__).resolve().parents[1]
+
+
+def _resolve_tool(env_key: str, name: str, mac_default: str) -> str:
+    """解析工具可执行文件：优先环境变量，其次 PATH，再次 macOS 默认路径。"""
+    value = os.environ.get(env_key)
+    if value:
+        return value
+    found = shutil.which(name)
+    if found:
+        return found
+    if sys.platform == "darwin":
+        return mac_default
+    return name
+
+
+def _node_bin() -> str:
+    """返回 Node 可执行目录：优先环境变量 NODE_BIN / NODE22_BIN，macOS 用默认本地 Node 22。"""
+    value = os.environ.get("NODE_BIN") or os.environ.get("NODE22_BIN")
+    if value:
+        return value
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/.local/node-v22.23.2-darwin-x64/bin")
+    return ""
+
+
+def _cmd(bin_path: str, *args: str) -> list[str]:
+    """返回可执行命令列表；Windows 上若目标为 .cmd/.bat，用 cmd /c 包装。"""
+    if os.name == "nt" and str(bin_path).lower().endswith((".cmd", ".bat")):
+        return ["cmd", "/c", bin_path, *args]
+    return [bin_path, *args]
+
+
+def _chrome_hint() -> str:
+    if os.name == "nt":
+        return "1. Google Chrome 已安装（如 C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe）"
+    return "1. Google Chrome 已安装（/Applications/Google Chrome.app）"
+
+
+CODEX = _resolve_tool("CODEX_BIN", "codex", "/usr/local/bin/codex")
+PLAYWRIGHT = _resolve_tool("PLAYWRIGHT_BIN", "playwright-cli", "/usr/local/bin/playwright-cli")
 
 
 def _env():
     env = os.environ.copy()
-    env["PATH"] = NODE22 + ":" + env.get("PATH", "")
+    node_bin = _node_bin()
+    if node_bin:
+        env["PATH"] = node_bin + os.pathsep + env.get("PATH", "")
     env.setdefault("NO_UPDATE_NOTIFIER", "1")
     return env
 
@@ -32,6 +73,17 @@ def _env():
 def build_prompt(url: str, steps: str, headed: bool, session: str) -> str:
     mode = "有头 headed（可见浏览器窗口）" if headed else "无头 headless（不显示窗口）"
     head_flag = " --headed" if headed else ""
+    node_bin = _node_bin()
+    if os.name == "nt":
+        path_hint = (
+            f'$env:Path = "{node_bin};$env:Path"' if node_bin
+            else "确保 playwright-cli 已在当前系统的 PATH 中"
+        )
+    else:
+        path_hint = (
+            f'export PATH="{node_bin}:$PATH"' if node_bin
+            else "确保 playwright-cli 已在当前系统的 PATH 中"
+        )
     return f"""{steps}
 
 请用本地的 playwright-cli 技能（web-test-runner / playwright-cli）对真实网页执行一次 UI 自动化测试。
@@ -41,7 +93,7 @@ def build_prompt(url: str, steps: str, headed: bool, session: str) -> str:
 浏览器会话：-s={session}（后续所有 playwright-cli 命令都必须带上 -s={session}）
 
 要求：
-1. 如需运行 playwright-cli，先执行：export PATH="$HOME/.local/node-v22.23.2-darwin-x64/bin:$PATH"
+1. 如需运行 playwright-cli，先执行：{path_hint}
 2. 用 -s={session} open --browser chrome{head_flag} 打开浏览器；open 之后先 snapshot 读取页面元素，再按用户给出的步骤执行。
 3. 每执行完一步，标记该步 PASS 或 FAIL；若元素找不到、步骤无法完成，记录 FAIL 并说明原因。
 4. **停止条件**：若浏览器窗口被手动关闭，或命令报错提示浏览器未打开 / 连接已断开（如 "browser is not open" / "TargetClosedError" / "Browser has been closed"），必须**立即停止执行**，不要再执行任何后续步骤，也不要在已断开的浏览器上反复重试。
@@ -58,7 +110,7 @@ def _probe_browser(timeout: float = 15.0) -> tuple:
     """
     env = _env()
     session = f"probe_{uuid.uuid4().hex[:8]}"
-    cmd = [PLAYWRIGHT, f"-s={session}", "open", "--browser", "chrome"]
+    cmd = _cmd(PLAYWRIGHT, f"-s={session}", "open", "--browser", "chrome")
     t0 = time.time()
     try:
         proc = subprocess.run(
@@ -72,7 +124,7 @@ def _probe_browser(timeout: float = 15.0) -> tuple:
         cost = round(time.time() - t0, 1)
         if proc.returncode == 0:
             subprocess.run(
-                [PLAYWRIGHT, f"-s={session}", "close"],
+                _cmd(PLAYWRIGHT, f"-s={session}", "close"),
                 capture_output=True,
                 env=env,
                 timeout=8,
@@ -81,7 +133,7 @@ def _probe_browser(timeout: float = 15.0) -> tuple:
         msg = (proc.stderr or proc.stdout or "").strip()[:300]
         return False, f"浏览器启动失败：{msg}"
     except subprocess.TimeoutExpired:
-        subprocess.run([PLAYWRIGHT, "kill-all"], capture_output=True, env=env, timeout=8)
+        subprocess.run(_cmd(PLAYWRIGHT, "kill-all"), capture_output=True, env=env, timeout=8)
         return False, f"浏览器启动超过 {int(timeout)} 秒仍未成功，已停止执行。"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
@@ -94,7 +146,7 @@ def _browser_alive(session: str, env: dict) -> bool | None:
     """
     try:
         rs = subprocess.run(
-            [PLAYWRIGHT, "list"],
+            _cmd(PLAYWRIGHT, "list"),
             capture_output=True, text=True, timeout=6, env=env,
         )
         out = rs.stdout or ""
@@ -107,7 +159,7 @@ def _close_browser_session(env: dict, session: str) -> None:
     """尝试关闭指定浏览器会话，忽略错误（用于清理残留 daemon / Chrome 窗口）。"""
     try:
         subprocess.run(
-            [PLAYWRIGHT, f"-s={session}", "close"],
+            _cmd(PLAYWRIGHT, f"-s={session}", "close"),
             capture_output=True,
             timeout=8,
             env=env,
@@ -132,9 +184,8 @@ def run_ui(url: str, steps: str, headed: bool, timeout: int | None = None) -> di
             "output": (
                 "⏱️ 浏览器启动检测未通过，已停止执行，未调用 Codex。\n\n"
                 f"原因：{probe_msg}\n\n"
-                "请确认：\n"
-                "1. Google Chrome 已安装（/Applications/Google Chrome.app）\n"
-                "2. playwright-cli 可用（Node 22 路径已自动设置）\n"
+                f"请确认：\n{_chrome_hint()}\n"
+                "2. playwright-cli 可用（已在 PATH，或用环境变量指定）\n"
                 "3. 若本机首次运行，可在「显示浏览器窗口」勾选有头模式后重试。"
             ),
             "duration": 0,
@@ -144,11 +195,11 @@ def run_ui(url: str, steps: str, headed: bool, timeout: int | None = None) -> di
 
     tmp = tempfile.mktemp(prefix="codex_out_", suffix=".md")
     sandbox = os.environ.get("CODEX_SANDBOX", "danger-full-access")
-    cmd = [
+    cmd = _cmd(
         CODEX, "exec", "--ephemeral", "--skip-git-repo-check",
         "--sandbox", sandbox,
         "-C", str(PROJ), "-o", tmp, prompt,
-    ]
+    )
     cmd_str = " ".join(cmd)
     started = time.time()
 
@@ -166,7 +217,7 @@ def run_ui(url: str, steps: str, headed: bool, timeout: int | None = None) -> di
     except FileNotFoundError:
         return {
             "status": "错误",
-            "output": "未找到 codex 命令，请确认本机已安装 Codex CLI（/usr/local/bin/codex）。",
+            "output": "未找到 codex 命令，请确认本机已安装 Codex CLI，或用环境变量 CODEX_BIN 指定可执行路径。",
             "duration": 0,
             "prompt": prompt,
             "cmd": cmd_str,

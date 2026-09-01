@@ -157,13 +157,19 @@ while True:
 | `UI_CLOSE_GRACE` | `3` | 浏览器被关后的停止宽限（秒） |
 | `UI_BROWSER_TIMEOUT` | `15` | 启动前浏览器探测超时（秒） |
 | `CODEX_SANDBOX` | `danger-full-access` | `codex exec` 的沙箱模式 |
+| `CODEX_BIN` | 自动探测 | `codex` 可执行文件路径（Windows 可指向 `.exe`/`.cmd`） |
+| `PLAYWRIGHT_BIN` | 自动探测 | `playwright-cli` 可执行文件路径 |
+| `NODE_BIN` / `NODE22_BIN` | macOS 默认 Node 22 | Node 可执行目录（Windows 建议指向 Node 的 bin 目录） |
 
 ---
 
 ## 三、环境要求
 
 - Python 3.10+
-- 一键 UI 自动化依赖本机：`codex` CLI、`playwright-cli`（`/usr/local/bin/playwright-cli`）与 Node 22、系统 **Google Chrome**。
+- 一键 UI 自动化依赖本机：`codex` CLI、`playwright-cli`、Node 22、系统 **Google Chrome**。
+- **平台自适应（macOS / Windows）**：工具路径优先读环境变量 `CODEX_BIN` / `PLAYWRIGHT_BIN` / `NODE_BIN`，
+  其次从 `PATH` 自动解析，macOS 另有默认路径兜底。在 Windows 上安装好上述工具后即可运行
+  （`.cmd` 会自动用 `cmd /c` 调用；提示词会按平台生成 `export PATH=...` 或 `$env:Path=...`）。
 
 首次执行时，Codex 打开浏览器或联网会弹出授权提示，**需在授权窗口点「允许」**（方案 B）。
 若页面报告超时/授权，可复制结果中给出的命令，在终端手动运行并在授权窗口允许。
