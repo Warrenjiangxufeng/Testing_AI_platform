@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}接口测试 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">接口测试</h1>
+    <p class="page-subtitle">实时请求调试接口，或管理你的接口用例。</p>
+  </div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab active" data-tab="tab-request" type="button">接口请求</button>
+  <button class="tab" data-tab="tab-cases" type="button">接口用例</button>
+</div>
+
+<!-- Tab 1: 实时请求 -->
+<section class="tab-panel active" id="tab-request">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">实时接口请求</h2>
+      <span class="panel-hint">填入请求信息，点击发送即可查看响应</span>
+    </div>
+
+    <div class="req-grid">
+      <div class="field">
+        <label class="label">请求方法</label>
+        <select class="input select" id="q-method">
+          {% for m in ['GET','POST','PUT','DELETE','PATCH'] %}
+            <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field grow">
+        <label class="label">请求 URL</label>
+        <input class="input" type="text" id="q-url" placeholder="https://api.example.com/resource">
+      </div>
+      <div class="field full">
+        <label class="label">请求头 (JSON)</label>
+        <textarea class="input textarea code-input" id="q-headers" rows="3">{"Content-Type": "application/json"}</textarea>
+      </div>
+      <div class="field full">
+        <label class="label">请求体 (JSON)</label>
+        <textarea class="input textarea code-input" id="q-body" rows="5" placeholder='{"key": "value"}'></textarea>
+      </div>
+      <div class="form-footer full">
+        <button class="btn btn-primary" id="q-send" type="button">▶ 发送请求</button>
+      </div>
+    </div>
+
+    <div class="resp-area" id="q-result" hidden>
+      <div class="resp-meta">
+        <span class="method method-{{ 'GET' }}" id="q-status-method">GET</span>
+        <span class="pill" id="q-status-code">—</span>
+        <span class="resp-time" id="q-status-time"></span>
+      </div>
+      <div class="panel-head"><h2 class="panel-title">响应内容</h2></div>
+      <pre class="code-box result-box" id="q-body-out"></pre>
+    </div>
+    <div class="resp-area" id="q-error" hidden>
+      <div class="flash error" id="q-error-text"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Tab 2: 接口用例 -->
+<section class="tab-panel" id="tab-cases">
+  <div class="toolbar">
+    <div class="page-actions">
+      <a class="btn btn-primary" href="{{ url_for('api.create') }}">＋ 添加接口用例</a>
+    </div>
+  </div>
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>名称</th>
+          <th>方法</th>
+          <th>URL</th>
+          <th>预期状态</th>
+          <th>实际状态</th>
+          <th>耗时</th>
+          <th>结果</th>
+          <th class="th-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for case in cases %}
+        <tr>
+          <td class="muted">#{{ case.id }}</td>
+          <td><a class="row-title" href="{{ url_for('api.edit', case_id=case.id) }}">{{ case.name }}</a></td>
+          <td><span class="method method-{{ case.method }}">{{ case.method }}</span></td>
+          <td class="truncate url-cell">{{ case.url }}</td>
+          <td>{{ case.expected_status }}</td>
+          <td>{{ case.last_status if case.last_status is not none else '—' }}</td>
+          <td>{{ '%.0fms'|format(case.last_time_ms) if case.last_time_ms else '—' }}</td>
+          <td><span class="pill status-{{ case.last_result }}">{{ case.last_result }}</span></td>
+          <td class="row-actions">
+            <a class="btn-sm" href="{{ url_for('api.edit', case_id=case.id) }}">编辑</a>
+            <form method="POST" action="{{ url_for('api.send_once', case_id=case.id) }}" class="inline">
+              <button class="btn-sm send" type="submit">发送</button>
+            </form>
+            <form method="POST" action="{{ url_for('api.delete', case_id=case.id) }}" class="inline" data-confirm="确认删除该接口用例？">
+              <button class="btn-sm danger" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="empty">暂无接口用例，点击「添加接口用例」开始。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    // 实时请求
+    const sendBtn = document.getElementById("q-send");
+    const out = document.getElementById("q-result");
+    const err = document.getElementById("q-error");
+    if (sendBtn) {
+      sendBtn.addEventListener("click", async () => {
+        const method = document.getElementById("q-method").value;
+        const url = document.getElementById("q-url").value.trim();
+        const headers = document.getElementById("q-headers").value;
+        const body = document.getElementById("q-body").value;
+        out.hidden = true; err.hidden = true;
+        if (!url) { err.hidden = false; document.getElementById("q-error-text").textContent = "请填写请求 URL"; return; }
+        sendBtn.disabled = true; sendBtn.textContent = "请求中…";
+        try {
+          const resp = await fetch("{{ url_for('api.quick_request') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ method, url, headers, body }),
+          });
+          const data = await resp.json();
+          if (!data.ok) {
+            err.hidden = false;
+            document.getElementById("q-error-text").textContent = data.error || "请求失败";
+          } else {
+            document.getElementById("q-status-method").textContent = data.method;
+            const codeEl = document.getElementById("q-status-code");
+            codeEl.textContent = data.status_code + " " + (data.status_code >= 200 && data.status_code < 400 ? "通过" : "失败");
+            codeEl.className = "pill status-" + (data.status_code >= 200 && data.status_code < 400 ? "通过" : "失败");
+            document.getElementById("q-status-time").textContent = data.time_ms + " ms";
+            document.getElementById("q-body-out").textContent = data.body || "（空响应体）";
+            out.hidden = false;
+          }
+        } catch (e) {
+          err.hidden = false;
+          document.getElementById("q-error-text").textContent = "请求异常：" + e;
+        } finally {
+          sendBtn.disabled = false; sendBtn.textContent = "▶ 发送请求";
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

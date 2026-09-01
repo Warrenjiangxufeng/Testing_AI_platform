@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑用例' if case else '新建用例' }} · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ '编辑用例' if case else '新建用例' }}</h1>
+    <p class="page-subtitle">左侧填写基本信息，右侧填写用例细节，便于后续执行与回溯。</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('testcases.list_cases', _anchor='functional-cases') }}">返回列表</a>
+</div>
+
+<form method="POST" class="card form-card">
+  <div class="form-split">
+    <div class="form-col">
+      <div class="field">
+        <label class="label">用例名称 *</label>
+        <input class="input" type="text" name="name" value="{{ case.name if case }}" placeholder="例如：用户登录-正确账号可登录" required>
+      </div>
+      <div class="field">
+        <label class="label">所属模块</label>
+        <input class="input" type="text" name="module" value="{{ case.module if case else '通用' }}" placeholder="例如：用户模块">
+      </div>
+      <div class="field">
+        <label class="label">优先级</label>
+        <select class="input select" name="priority">
+          {% for p in ['P1','P2','P3','P4'] %}
+            <option value="{{ p }}" {{ 'selected' if case and case.priority == p }}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">用例类型</label>
+        <select class="input select" name="case_type">
+          {% for t in ['功能','接口','兼容','性能'] %}
+            <option value="{{ t }}" {{ 'selected' if case and case.case_type == t }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">状态</label>
+        <select class="input select" name="status">
+          {% for s in ['草稿','待执行','通过','失败','阻塞'] %}
+            <option value="{{ s }}" {{ 'selected' if case and case.status == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">创建人</label>
+        <input class="input" type="text" name="creator" value="{{ case.creator if case else '管理员' }}">
+      </div>
+    </div>
+
+    <div class="form-col">
+      <div class="field">
+        <label class="label">前置条件</label>
+        <textarea class="input textarea" name="precondition" rows="2" placeholder="进入用例前需要具备的条件...">{{ case.precondition if case }}</textarea>
+      </div>
+      <div class="field grow">
+        <label class="label">测试步骤</label>
+        <textarea class="input textarea" name="steps" rows="7" placeholder="1. ...&#10;2. ...&#10;3. ...">{{ case.steps if case }}</textarea>
+      </div>
+      <div class="field grow">
+        <label class="label">预期结果</label>
+        <textarea class="input textarea" name="expected_result" rows="3" placeholder="执行后应出现的结果...">{{ case.expected_result if case }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-footer">
+    <a class="btn btn-ghost" href="{{ url_for('testcases.list_cases', _anchor='functional-cases') }}">取消</a>
+    <button class="btn btn-primary" type="submit">{{ '保存修改' if case else '创建用例' }}</button>
+  </div>
+</form>
+{% endblock %}

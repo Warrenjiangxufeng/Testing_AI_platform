@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}性能测试 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">性能测试</h1>
+    <p class="page-subtitle">指定并发与请求量，快速评估接口吞吐与响应时间。</p>
+  </div>
+</div>
+
+<div class="panel hero-panel">
+  <h2 class="panel-title">发起压测</h2>
+  <form method="POST" action="{{ url_for('perf.run') }}" class="ai-form">
+    <div class="field">
+      <label class="label">压测名称</label>
+      <input class="input" type="text" name="name" placeholder="如：登录接口回归压测">
+    </div>
+    <div class="field">
+      <label class="label">请求方法</label>
+      <select class="input select" name="method">
+        {% for m in ['GET','POST','PUT','DELETE'] %}
+          <option value="{{ m }}">{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field full">
+      <label class="label">目标 URL *</label>
+      <input class="input" type="text" name="url" placeholder="https://api.example.com/health" required>
+    </div>
+    <div class="field">
+      <label class="label">并发数</label>
+      <input class="input" type="number" name="concurrent" value="10" min="1" max="50">
+    </div>
+    <div class="field">
+      <label class="label">总请求数</label>
+      <input class="input" type="number" name="total" value="100" min="1" max="2000">
+    </div>
+    <div class="field full">
+      <label class="label">请求头 (JSON，可选)</label>
+      <textarea class="input textarea code-input" name="headers" rows="2">{"Content-Type": "application/json"}</textarea>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-primary" type="submit" data-loading="压测中…">⚡ 开始压测</button>
+    </div>
+  </form>
+</div>
+
+<h2 class="section-title">历史结果</h2>
+<div class="card">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>名称</th>
+        <th>URL</th>
+        <th>并发/总量</th>
+        <th>成功</th>
+        <th>失败</th>
+        <th>QPS</th>
+        <th>平均</th>
+        <th>P95</th>
+        <th>错误率</th>
+        <th>状态</th>
+        <th class="th-actions">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td class="muted">#{{ run.id }}</td>
+        <td>{{ run.name }}</td>
+        <td class="truncate url-cell">{{ run.url }}</td>
+        <td>{{ run.concurrent }} / {{ run.total_requests }}</td>
+        <td class="success-text">{{ run.success }}</td>
+        <td class="danger-text">{{ run.failed }}</td>
+        <td>{{ '%.1f'|format(run.qps) }}</td>
+        <td>{{ '%.0fms'|format(run.avg_ms) }}</td>
+        <td>{{ '%.0fms'|format(run.p95_ms) }}</td>
+        <td>{{ '%.2f%%'|format(run.error_rate) }}</td>
+        <td><span class="pill status-{{ '通过' if run.status == '完成' else '失败' }}">{{ run.status }}</span></td>
+        <td class="row-actions">
+          <form method="POST" action="{{ url_for('perf.delete', run_id=run.id) }}" class="inline" data-confirm="确认删除该压测记录？">
+            <button class="btn-sm danger" type="submit">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="12" class="empty">暂无压测记录，填写上方表单开始第一次压测。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

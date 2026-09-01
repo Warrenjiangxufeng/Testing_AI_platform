@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}功能用例 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">功能用例</h1>
+    <p class="page-subtitle">上传 AI 执行用例文件（Excel / XMind / Word），或维护功能测试用例。</p>
+  </div>
+</div>
+
+<div class="tabs" id="case-tabs">
+  <button class="tab active" data-tab="ai-exec-upload">AI 执行用例上传</button>
+  <button class="tab" data-tab="functional-cases">功能用例管理</button>
+</div>
+
+<!-- ========== AI 执行用例上传 tab ========== -->
+<div class="tab-panel active" id="ai-exec-upload">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">上传 AI 执行用例</h2>
+      <span class="panel-hint">自动解析文件内容，作为 AI 自动化测试步骤</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('testcases.upload_ai_exec') }}"
+          enctype="multipart/form-data" class="upload-form" data-no-loading id="upload-form">
+      <label class="upload-drop" id="upload-drop">
+        <input type="file" name="file" id="upload-file"
+               accept=".xlsx,.xls,.docx,.doc,.xmind" class="upload-input" required>
+        <span class="upload-icon" aria-hidden="true">📤</span>
+        <span class="upload-title">点击选择或拖拽文件到此处</span>
+        <span class="upload-sub">支持 Excel (.xlsx / .xls) · Word (.docx / .doc) · XMind (.xmind)</span>
+      </label>
+      <div class="upload-actions">
+        <span class="upload-file-name" id="upload-file-name">未选择文件</span>
+        <button class="btn btn-primary" type="submit">上传用例</button>
+      </div>
+    </form>
+  </div>
+
+  <h2 class="section-title">已上传用例</h2>
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>文件名</th>
+          <th>类型</th>
+          <th>大小</th>
+          <th>上传时间</th>
+          <th class="th-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in ai_exec_cases %}
+        <tr>
+          <td>
+            <span class="file-name" title="{{ rec.name }}">{{ rec.name }}</span>
+            {% if not rec.content or rec.content.startswith('（') %}
+              <span class="pill status-错误">解析异常</span>
+            {% else %}
+              <span class="pill status-通过">已解析</span>
+            {% endif %}
+          </td>
+          <td><span class="tag file-tag file-{{ rec.file_type }}">{{ rec.ext|upper }}</span></td>
+          <td>{{ (rec.size / 1024)|round(1) }} KB</td>
+          <td class="muted">{{ rec.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="row-actions">
+            <button class="btn-sm send" type="button"
+                    data-preview="{{ url_for('testcases.preview_ai_exec', case_id=rec.id) }}"
+                    data-download="{{ url_for('testcases.download_ai_exec', case_id=rec.id) }}">预览</button>
+            <a class="btn-sm" href="{{ url_for('testcases.download_ai_exec', case_id=rec.id) }}">下载</a>
+            <form method="POST" action="{{ url_for('testcases.delete_ai_exec', case_id=rec.id) }}"
+                  class="inline" data-confirm="确认删除该用例文件？">
+              <button class="btn-sm danger" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">还没有上传用例，先在上方选择一个 Excel / Word / XMind 文件。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========== 功能用例管理 tab ========== -->
+<div class="tab-panel" id="functional-cases">
+  <div class="toolbar case-toolbar">
+    <form method="GET" action="{{ url_for('testcases.list_cases', _anchor='functional-cases') }}" class="filter-form">
+      <input class="input" type="text" name="q" value="{{ filters.q }}" placeholder="搜索用例名称...">
+      <select class="input select" name="module">
+        <option value="">全部模块</option>
+        {% for m in modules %}
+          <option value="{{ m }}" {{ 'selected' if filters.module == m }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+      <select class="input select" name="status">
+        <option value="">全部状态</option>
+        {% for s in ['草稿','待执行','通过','失败','阻塞'] %}
+          <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">筛选</button>
+      <a class="btn btn-ghost" href="{{ url_for('testcases.list_cases', _anchor='functional-cases') }}">重置</a>
+    </form>
+    <a class="btn btn-primary" href="{{ url_for('testcases.create_case') }}">＋ 新建用例</a>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>用例名称</th>
+          <th>模块</th>
+          <th>优先级</th>
+          <th>类型</th>
+          <th>状态</th>
+          <th>创建人</th>
+          <th class="th-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for case in cases %}
+        <tr>
+          <td class="muted">#{{ case.id }}</td>
+          <td>
+            <a class="row-title" href="{{ url_for('testcases.edit_case', case_id=case.id) }}">{{ case.name }}</a>
+          </td>
+          <td><span class="tag">{{ case.module }}</span></td>
+          <td>{{ case.priority }}</td>
+          <td>{{ case.case_type }}</td>
+          <td><span class="pill status-{{ case.status }}">{{ case.status }}</span></td>
+          <td>{{ case.creator }}</td>
+          <td class="row-actions">
+            <a class="btn-sm" href="{{ url_for('testcases.edit_case', case_id=case.id) }}">编辑</a>
+            <form method="POST" action="{{ url_for('testcases.delete_case', case_id=case.id) }}" class="inline" data-confirm="确认删除该用例？">
+              <button class="btn-sm danger" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">暂无用例，点击右侧「新建用例」开始。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 预览弹窗 -->
+<div class="modal-overlay" id="preview-modal" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="preview-modal-title">用例预览</h3>
+      <button class="modal-close" type="button" id="preview-close-x" aria-label="关闭">×</button>
+    </div>
+    <iframe class="modal-frame" id="preview-frame" title="用例预览"></iframe>
+    <div class="modal-foot">
+      <a id="preview-download" class="btn btn-ghost" href="#" download>↓ 下载原文件</a>
+      <button class="btn btn-primary" type="button" id="preview-close-btn">关闭</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    // ---------- Tab 切换（默认展示 AI 执行用例上传，支持 URL #hash 定位） ----------
+    var tabs = document.getElementById('case-tabs');
+    var tabBtns = tabs ? tabs.querySelectorAll('.tab') : [];
+    var panels = document.querySelectorAll('#ai-exec-upload, #functional-cases');
+
+    function activate(tabId) {
+      tabBtns.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === tabId); });
+      panels.forEach(function (p) { p.classList.toggle('active', p.id === tabId); });
+    }
+
+    var hash = window.location.hash.replace('#', '');
+    if (hash === 'functional-cases') {
+      activate('functional-cases');
+    } else {
+      activate('ai-exec-upload');
+    }
+
+    tabBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activate(btn.getAttribute('data-tab'));
+        if (window.history.replaceState) {
+          window.history.replaceState(null, '', '#' + btn.getAttribute('data-tab'));
+        }
+      });
+    });
+
+    // ---------- 上传：显示文件名 + 拖拽高亮 ----------
+    var fileInput = document.getElementById('upload-file');
+    var fileLabel = document.getElementById('upload-file-name');
+    var drop = document.getElementById('upload-drop');
+    var form = document.getElementById('upload-form');
+
+    function setFileLabel() {
+      if (fileInput && fileInput.files.length) {
+        fileLabel.textContent = fileInput.files[0].name;
+        drop.classList.add('has-file');
+      } else {
+        fileLabel.textContent = '未选择文件';
+        drop.classList.remove('has-file');
+      }
+    }
+    if (fileInput) {
+      fileInput.addEventListener('change', setFileLabel);
+    }
+
+    if (drop && form) {
+      ['dragenter', 'dragover'].forEach(function (evt) {
+        drop.addEventListener(evt, function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          drop.classList.add('drag');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (evt) {
+        drop.addEventListener(evt, function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          drop.classList.remove('drag');
+        });
+      });
+      drop.addEventListener('drop', function (e) {
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length && fileInput) {
+          try {
+            var dt = new DataTransfer();
+            dt.items.add(files[0]);
+            fileInput.files = dt.files;
+          } catch (err) {
+            // 某些浏览器不允许设置 files，交给用户点击选择
+          }
+          setFileLabel();
+        }
+      });
+    }
+
+    // ---------- 预览弹窗 ----------
+    var modal = document.getElementById('preview-modal');
+    var frame = document.getElementById('preview-frame');
+    var dl = document.getElementById('preview-download');
+    var closeX = document.getElementById('preview-close-x');
+    var closeBtn = document.getElementById('preview-close-btn');
+
+    function openPreview(url, downloadUrl, name) {
+      frame.src = url;
+      dl.href = downloadUrl;
+      document.getElementById('preview-modal-title').textContent = '用例预览 · ' + name;
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+    function closePreview() {
+      frame.src = 'about:blank';
+      modal.hidden = true;
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-preview]');
+      if (btn) {
+        e.preventDefault();
+        var row = btn.closest('tr');
+        var name = row ? row.querySelector('.file-name').textContent : '';
+        openPreview(btn.getAttribute('data-preview'), btn.getAttribute('data-download'), name);
+      } else if (e.target === modal) {
+        closePreview();
+      }
+    });
+    if (closeX) closeX.addEventListener('click', closePreview);
+    if (closeBtn) closeBtn.addEventListener('click', closePreview);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePreview();
+    });
+  })();
+</script>
+{% endblock %}

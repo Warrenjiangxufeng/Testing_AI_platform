@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}AI 自动化测试 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">AI 自动化测试</h1>
+    <p class="page-subtitle">输入测试步骤，调用本地 Codex 用 playwright-cli 一键执行 UI 自动化。</p>
+  </div>
+</div>
+
+<div class="panel hero-panel">
+  <div class="panel-head">
+    <h2 class="panel-title">一键执行 UI 自动化</h2>
+    <span class="panel-hint">Codex + playwright-cli 驱动真实 Chrome</span>
+  </div>
+  <form method="POST" action="{{ url_for('ai.ui_run') }}" class="ai-form">
+    <div class="field full">
+      <label class="label">目标 URL *</label>
+      <input class="input" type="text" name="url" id="url-input" placeholder="https://www.baidu.com" required>
+    </div>
+    <div class="field full">
+      <label class="label">选择 AI 执行用例（可选，选择后自动作为测试步骤）</label>
+      {% if ai_exec_cases %}
+      <select class="input select exec-case-select" id="exec-case-select" name="exec_case_id">
+        <option value="">不选择（使用下方手动输入的步骤）</option>
+        {% for c in ai_exec_cases %}
+        {% set usable = c.content and not c.content.startswith('（') %}
+        <option value="{{ c.id }}" {{ 'disabled' if not usable }}>{{ c.name }}（{{ c.ext|upper }}）</option>
+        {% endfor %}
+      </select>
+      <div class="hint-text">选择后，测试步骤将由所选文件内容自动生成，输入框会锁定；不选择则使用下方手动输入的步骤。</div>
+      {% else %}
+      <div class="hint-text">尚未上传 AI 执行用例，可到「功能用例 → AI 执行用例上传」页面上传 Excel / Word / XMind 文件。</div>
+      {% endif %}
+    </div>
+    <div class="field full">
+      <label class="label">测试步骤（用自然语言描述）*</label>
+      <textarea class="input textarea" name="steps" id="steps-input" rows="4" required
+        placeholder="例如：打开浏览器，进入百度页面，搜索 lisa是谁，点开第一个链接"></textarea>
+      <div class="hint-text exec-hint" id="exec-case-hint" hidden>已选择 AI 执行用例，测试步骤已由所选文件内容自动生成，输入框已锁定。</div>
+    </div>
+    <div class="field">
+      <label class="label">显示浏览器窗口</label>
+      <label class="switch-row">
+        <input type="checkbox" name="headed" value="1">
+        <span class="switch"></span>
+        <span class="switch-label">有头模式（可看到操作过程）</span>
+      </label>
+    </div>
+    <div class="field">
+      <label class="label">运行说明</label>
+      <div class="hint-text">默认无头运行；开始前会先探测浏览器，超过 15 秒未启动会自动停止并提示。打开浏览器/联网时 Codex 可能弹授权，需在授权窗口中允许。</div>
+    </div>
+    <div class="form-footer full">
+      <button class="btn btn-primary" type="submit" data-loading="执行中…">▶ 一键执行 UI 自动化</button>
+    </div>
+  </form>
+</div>
+
+<h2 class="section-title">测试报告</h2>
+<div class="card">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>标题</th>
+        <th>模型</th>
+        <th>测试步骤</th>
+        <th>状态</th>
+        <th>耗时</th>
+        <th>时间</th>
+        <th class="th-actions">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td class="muted">#{{ run.id }}</td>
+        <td><a class="row-title report-title" href="{{ url_for('ai.detail', run_id=run.id) }}" title="{{ run.title }}">{{ run.title }}</a></td>
+        <td>{{ run.model }}{% if run.kind == 'ui' %} <span class="tag">UI</span>{% endif %}{% if run.output %} <span class="tag">已生成报告</span>{% endif %}</td>
+        <td class="truncate" title="{{ run.prompt }}">{{ run.prompt }}</td>
+        <td><span class="pill status-{{ run.status }}">{{ run.status }}</span></td>
+        <td>{{ '%.3fs'|format(run.duration) if run.duration else '—' }}</td>
+        <td class="muted">{{ run.created_at.strftime('%m-%d %H:%M') }}</td>
+        <td class="row-actions">
+          <a class="btn-sm" href="{{ url_for('ai.detail', run_id=run.id) }}">查看</a>
+          <button class="btn-sm" type="button" data-preview="{{ url_for('ai.report', run_id=run.id) }}" data-download="{{ url_for('ai.download', run_id=run.id) }}">预览</button>
+          <a class="btn-sm" href="{{ url_for('ai.download', run_id=run.id) }}">下载</a>
+          <form method="POST" action="{{ url_for('ai.delete', run_id=run.id) }}" class="inline" data-confirm="确认删除该次 AI 测试？">
+            <button class="btn-sm danger" type="submit">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">还没有测试报告，运行一次「一键执行 UI 自动化」即可生成。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="report-modal" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="report-modal-title">测试报告预览</h3>
+      <button class="modal-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <iframe class="modal-frame" id="report-frame" title="测试报告"></iframe>
+    <div class="modal-foot">
+      <a id="report-download" class="btn btn-ghost" href="#" download>↓ 下载这份报告</a>
+      <button class="btn btn-primary" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var execCases = {{ exec_cases_data | tojson }};
+    var stepsInput = document.getElementById('steps-input');
+    var execSelect = document.getElementById('exec-case-select');
+    var execHint = document.getElementById('exec-case-hint');
+    var manualSteps = stepsInput ? stepsInput.value : '';
+
+    function syncExecCase() {
+      if (!stepsInput) return;
+      var val = execSelect ? execSelect.value : '';
+      var data = execCases.find(function (c) { return String(c.id) === val; });
+      if (data && data.content) {
+        // 选择了用例：用文件解析内容作为测试步骤，锁住输入框
+        stepsInput.value = data.content;
+        stepsInput.readOnly = true;
+        stepsInput.classList.add('is-locked');
+        if (execHint) execHint.hidden = false;
+      } else {
+        // 未选择用例：恢复手动输入，输入框可编辑
+        stepsInput.value = manualSteps;
+        stepsInput.readOnly = false;
+        stepsInput.classList.remove('is-locked');
+        if (execHint) execHint.hidden = true;
+      }
+    }
+
+    if (stepsInput) {
+      stepsInput.addEventListener('input', function () { manualSteps = stepsInput.value; });
+    }
+    if (execSelect) {
+      execSelect.addEventListener('change', syncExecCase);
+    }
+  })();
+
+  (function () {
+    var modal = document.getElementById('report-modal');
+    var frame = document.getElementById('report-frame');
+    var dl = document.getElementById('report-download');
+    var closeBtn = modal.querySelector('.modal-close');
+    var footBtn = modal.querySelector('.modal-foot .btn-primary');
+
+    function openReport(url, downloadUrl) {
+      frame.src = url;
+      dl.href = downloadUrl;
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+    function closeReport() {
+      frame.src = 'about:blank';
+      modal.hidden = true;
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-preview]');
+      if (btn) {
+        e.preventDefault();
+        openReport(btn.getAttribute('data-preview'), btn.getAttribute('data-download'));
+      } else if (e.target === modal) {
+        closeReport();
+      }
+    });
+    closeBtn.addEventListener('click', closeReport);
+    footBtn.addEventListener('click', closeReport);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeReport();
+    });
+  })();
+</script>
+{% endblock %}

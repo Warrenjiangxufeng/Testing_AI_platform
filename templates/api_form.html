@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑接口' if case else '添加接口' }} · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ '编辑接口用例' if case else '添加接口用例' }}</h1>
+    <p class="page-subtitle">左侧为请求基础信息，右侧为请求头与请求体。</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('api.index') }}">返回列表</a>
+</div>
+
+<form method="POST" class="card form-card">
+  <div class="form-split">
+    <div class="form-col">
+      <div class="field">
+        <label class="label">用例名称 *</label>
+        <input class="input" type="text" name="name" value="{{ case.name if case }}" placeholder="例如：获取用户信息" required>
+      </div>
+      <div class="field">
+        <label class="label">请求方法</label>
+        <select class="input select" name="method">
+          {% for m in ['GET','POST','PUT','DELETE','PATCH'] %}
+            <option value="{{ m }}" {{ 'selected' if case and case.method == m }}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">预期状态码</label>
+        <input class="input" type="number" name="expected_status" value="{{ case.expected_status if case else 200 }}">
+      </div>
+      <div class="field grow">
+        <label class="label">请求 URL *</label>
+        <input class="input" type="text" name="url" value="{{ case.url if case }}" placeholder="https://api.example.com/resource" required>
+      </div>
+    </div>
+
+    <div class="form-col">
+      <div class="field">
+        <label class="label">请求头 (JSON)</label>
+        <textarea class="input textarea code-input" name="headers" rows="3">{{ case.headers if case else '{"Content-Type": "application/json"}' }}</textarea>
+      </div>
+      <div class="field grow">
+        <label class="label">请求体 (JSON)</label>
+        <textarea class="input textarea code-input" name="body" rows="6">{{ case.body if case }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-footer">
+    <a class="btn btn-ghost" href="{{ url_for('api.index') }}">取消</a>
+    <button class="btn btn-primary" type="submit">{{ '保存修改' if case else '创建接口用例' }}</button>
+  </div>
+</form>
+{% endblock %}

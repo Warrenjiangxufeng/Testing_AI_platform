@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}总览 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="hero-badge">Apple 风格设计</div>
+  <h1 class="hero-title">让测试更高效、更智能</h1>
+  <p class="hero-sub">功能用例 · AI 自动化 · 接口 · 性能 · 缺陷，一站式质量保障。</p>
+</div>
+
+<section class="stat-grid">
+  <a class="stat-card" href="{{ url_for('testcases.list_cases') }}">
+    <div class="stat-icon blue">🧪</div>
+    <div class="stat-num">{{ stats.total_cases }}</div>
+    <div class="stat-label">功能用例</div>
+  </a>
+  <a class="stat-card" href="{{ url_for('ai.index') }}">
+    <div class="stat-icon purple">🤖</div>
+    <div class="stat-num">{{ stats.ai_runs }}</div>
+    <div class="stat-label">AI 自动化</div>
+  </a>
+  <a class="stat-card" href="{{ url_for('api.index') }}">
+    <div class="stat-icon teal">🌐</div>
+    <div class="stat-num">{{ stats.api_cases }}</div>
+    <div class="stat-label">接口用例</div>
+  </a>
+  <a class="stat-card" href="{{ url_for('perf.index') }}">
+    <div class="stat-icon orange">⚡</div>
+    <div class="stat-num">{{ stats.perf_runs }}</div>
+    <div class="stat-label">性能压测</div>
+  </a>
+  <a class="stat-card" href="{{ url_for('bugs.index') }}">
+    <div class="stat-icon red">🐞</div>
+    <div class="stat-num">{{ stats.open_bugs }}</div>
+    <div class="stat-label">未关闭缺陷</div>
+  </a>
+</section>
+
+<section class="panel-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">各阶段执行概览</h2>
+      <span class="panel-hint">通过率视图</span>
+    </div>
+    <div class="bar-chart">
+      {% set groups = [
+        ('功能用例', stats.case_pass, stats.case_fail),
+        ('AI 自动化', stats.ai_pass, 0),
+        ('接口测试', stats.api_pass, 0),
+        ('性能压测', stats.perf_pass, 0),
+      ] %}
+      {% set max_v = [stats.case_pass, stats.ai_pass, stats.api_pass, stats.perf_pass] | max %}
+      {% for label, ok, fail in groups %}
+      <div class="bar-row">
+        <div class="bar-label">{{ label }}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: {{ (ok / max_v * 100)|round(1) if max_v else 0 }}%"></div>
+        </div>
+        <div class="bar-value">{{ ok }} 通过</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">缺陷状态分布</h2>
+      <span class="panel-hint">共 {{ stats.open_bugs }} 个待处理</span>
+    </div>
+    <div class="donut-wrap">
+      {% set total_bugs = stats.bug_status.values() | sum %}
+      {% if total_bugs %}
+        {% for status, count in stats.bug_status.items() %}
+        <div class="status-row">
+          <span class="status-dot {{ status }}"></span>
+          <span class="status-name">{{ status }}</span>
+          <span class="status-count">{{ count }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty-hint">暂无缺陷数据</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="quick-actions">
+  <h2 class="section-title">快捷操作</h2>
+  <div class="quick-grid">
+    <a class="quick-card" href="{{ url_for('testcases.create_case') }}">➕ 新建功能用例</a>
+    <a class="quick-card" href="{{ url_for('ai.index') }}">🤖 发起 AI 测试</a>
+    <a class="quick-card" href="{{ url_for('api.create') }}">🌐 添加接口用例</a>
+    <a class="quick-card" href="{{ url_for('perf.index') }}">⚡ 开始性能压测</a>
+    <a class="quick-card" href="{{ url_for('bugs.create') }}">🐞 提交缺陷</a>
+  </div>
+</section>
+{% endblock %}
+

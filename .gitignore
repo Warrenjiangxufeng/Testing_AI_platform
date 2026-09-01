@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+data.db
+instance/
+runs/
+uploads/
+.playwright-cli/
+server.log
+server.pid
+.DS_Store

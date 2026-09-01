@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑缺陷' if bug else '提交缺陷' }} · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ '编辑缺陷' if bug else '提交缺陷' }}</h1>
+    <p class="page-subtitle">左侧为缺陷属性，右侧为问题描述与复现步骤。</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('bugs.index') }}">返回列表</a>
+</div>
+
+<form method="POST" class="card form-card">
+  <div class="form-split">
+    <div class="form-col">
+      <div class="field">
+        <label class="label">缺陷标题 *</label>
+        <input class="input" type="text" name="title" value="{{ bug.title if bug }}" placeholder="例如：点击登录后出现白屏" required>
+      </div>
+      <div class="field">
+        <label class="label">所属模块</label>
+        <input class="input" type="text" name="module" value="{{ bug.module if bug else '通用' }}">
+      </div>
+      <div class="field">
+        <label class="label">严重程度</label>
+        <select class="input select" name="severity">
+          {% for s in ['致命','严重','一般','轻微','建议'] %}
+            <option value="{{ s }}" {{ 'selected' if bug and bug.severity == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">优先级</label>
+        <select class="input select" name="priority">
+          {% for p in ['P1','P2','P3','P4'] %}
+            <option value="{{ p }}" {{ 'selected' if bug and bug.priority == p }}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">状态</label>
+        <select class="input select" name="status">
+          {% for s in ['新建','进行中','已修复','已关闭','已拒绝'] %}
+            <option value="{{ s }}" {{ 'selected' if bug and bug.status == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">处理人</label>
+        <input class="input" type="text" name="assignee" value="{{ bug.assignee if bug }}" placeholder="例如：小李">
+      </div>
+    </div>
+
+    <div class="form-col">
+      <div class="field grow">
+        <label class="label">问题描述</label>
+        <textarea class="input textarea" name="description" rows="5" placeholder="说明问题现象、影响范围...">{{ bug.description if bug }}</textarea>
+      </div>
+      <div class="field grow">
+        <label class="label">复现步骤</label>
+        <textarea class="input textarea" name="steps" rows="5" placeholder="1. ...&#10;2. ...&#10;3. ...">{{ bug.steps if bug }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-footer">
+    <a class="btn btn-ghost" href="{{ url_for('bugs.index') }}">取消</a>
+    <button class="btn btn-primary" type="submit">{{ '保存修改' if bug else '提交缺陷' }}</button>
+  </div>
+</form>
+{% endblock %}

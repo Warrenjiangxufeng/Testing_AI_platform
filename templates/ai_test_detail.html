@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}AI 测试详情 · AI 测试平台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ run.title }}</h1>
+    <p class="page-subtitle">模型：{{ run.model }} · 状态：{{ run.status }}
+      {% if run.root_url %} · 目标：{{ run.root_url }}{% endif %}</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="{{ url_for('ai.index') }}">返回列表</a>
+    {% if run.kind != 'ui' %}
+    <form method="POST" action="{{ url_for('ai.execute', run_id=run.id) }}" class="inline">
+      <button class="btn btn-primary" type="submit">▶ 执行测试</button>
+    </form>
+    {% else %}
+    <span class="panel-hint">已由 Codex 执行</span>
+    {% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('ai.report', run_id=run.id) }}" target="_blank">预览报告</a>
+    <a class="btn btn-ghost" href="{{ url_for('ai.download', run_id=run.id) }}">下载报告</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2 class="panel-title">需求描述</h2>
+  </div>
+  <p class="muted-text">{{ run.prompt }}</p>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">{{ '交给 Codex 的指令' if run.kind == 'ui' else '生成的测试脚本' }}</h2>
+      <button class="btn-sm copy-btn" data-target="script-box">{{ '复制指令' if run.kind == 'ui' else '复制脚本' }}</button>
+    </div>
+    <pre class="code-box" id="script-box"><code>{{ run.generated_script }}</code></pre>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">{{ '执行报告' if run.kind == 'ui' else '执行结果' }}</h2>
+      <span class="pill status-{{ run.status }}">{{ run.status }}</span>
+    </div>
+    {% if run.output %}
+      <pre class="code-box result-box"><code>{{ run.output }}</code></pre>
+    {% else %}
+      <p class="empty-hint">{{ '等待 Codex 执行结果…' if run.kind == 'ui' else '尚未执行，点击右上角「执行测试」运行脚本。' }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('ai.delete', run_id=run.id) }}" class="inline mt" data-confirm="确认删除该次 AI 测试？">
+  <button class="btn btn-danger" type="submit">删除记录</button>
+</form>
+{% endblock %}
