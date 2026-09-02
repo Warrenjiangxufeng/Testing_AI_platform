@@ -494,12 +494,24 @@ body {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* 实时请求布局 */
-.req-grid {
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 20px;
-}
-.req-grid .field.full { grid-column: 1 / -1; }
+.req-grid { display: flex; flex-direction: column; gap: 20px; }
+
+/* 第一行：请求方法 + 请求 URL（正常单行高度，不拉伸成大方框） */
+.req-top { display: grid; grid-template-columns: 170px 1fr; gap: 20px; }
+
+/* 第二行：请求头 + 请求体（请求体更宽、大方框） */
+.req-bottom { display: grid; grid-template-columns: 1fr 1.45fr; gap: 20px; }
+
+.req-grid .field { display: flex; flex-direction: column; }
+.req-grid .field .input,
+.req-grid .field .textarea { width: 100%; }
+.req-grid .req-bottom .field .textarea { flex: 1; }
+.req-grid .req-bottom .field.headers .textarea { min-height: 120px; }
+.req-grid .req-bottom .field.body .textarea { min-height: 230px; }
+
+/* 发送按钮固定在右下角 */
+.req-grid .form-footer { margin-top: 0; }
+
 .resp-area {
   margin-top: 24px;
   padding-top: 22px;
@@ -508,7 +520,8 @@ body {
 .resp-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .resp-time { color: var(--text-3); font-size: 13px; font-weight: 600; }
 @media (max-width: 720px) {
-  .req-grid { grid-template-columns: 1fr; }
+  .req-top, .req-bottom { grid-template-columns: 1fr; }
+  .req-grid .req-bottom .field.body .textarea { min-height: 180px; }
 }
 
 .input {

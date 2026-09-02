@@ -24,27 +24,33 @@
     </div>
 
     <div class="req-grid">
-      <div class="field">
-        <label class="label">请求方法</label>
-        <select class="input select" id="q-method">
-          {% for m in ['GET','POST','PUT','DELETE','PATCH'] %}
-            <option value="{{ m }}">{{ m }}</option>
-          {% endfor %}
-        </select>
+      <div class="req-top">
+        <div class="field method">
+          <label class="label">请求方法</label>
+          <select class="input select" id="q-method">
+            {% for m in ['GET','POST','PUT','DELETE','PATCH'] %}
+              <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field grow">
+          <label class="label">请求 URL</label>
+          <input class="input" type="text" id="q-url" placeholder="https://api.example.com/resource">
+        </div>
       </div>
-      <div class="field grow">
-        <label class="label">请求 URL</label>
-        <input class="input" type="text" id="q-url" placeholder="https://api.example.com/resource">
+
+      <div class="req-bottom">
+        <div class="field headers">
+          <label class="label">请求头 (JSON)</label>
+          <textarea class="input textarea code-input" id="q-headers" rows="4">{"Content-Type": "application/json"}</textarea>
+        </div>
+        <div class="field body">
+          <label class="label">请求体 (JSON)</label>
+          <textarea class="input textarea code-input" id="q-body" rows="9" placeholder='{"key": "value"}'></textarea>
+        </div>
       </div>
-      <div class="field full">
-        <label class="label">请求头 (JSON)</label>
-        <textarea class="input textarea code-input" id="q-headers" rows="3">{"Content-Type": "application/json"}</textarea>
-      </div>
-      <div class="field full">
-        <label class="label">请求体 (JSON)</label>
-        <textarea class="input textarea code-input" id="q-body" rows="5" placeholder='{"key": "value"}'></textarea>
-      </div>
-      <div class="form-footer full">
+
+      <div class="form-footer">
         <button class="btn btn-primary" id="q-send" type="button">▶ 发送请求</button>
       </div>
     </div>
